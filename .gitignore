@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local state / secrets
+state.json
+email_state.json
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+/secrets
