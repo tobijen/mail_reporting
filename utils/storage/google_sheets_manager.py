@@ -111,6 +111,111 @@ class GoogleSheetManager:
         response["total_input_count"] = len(emails)
         return response
 
+    def get_values(
+        self,
+        spreadsheet_id: str,
+        range_name: str,
+    ) -> list[list[Any]]:
+        return self._get_values(spreadsheet_id, range_name)
+
+    def set_values(
+        self,
+        spreadsheet_id: str,
+        range_name: str,
+        values: list[list[Any]],
+        value_input_option: str = "RAW",
+    ) -> dict[str, Any]:
+        return self._set_values(
+            spreadsheet_id=spreadsheet_id,
+            range_name=range_name,
+            values=values,
+            value_input_option=value_input_option,
+        )
+
+    def append_values(
+        self,
+        spreadsheet_id: str,
+        range_name: str,
+        values: list[list[Any]],
+        value_input_option: str = "RAW",
+    ) -> dict[str, Any]:
+        return self._append_values(
+            spreadsheet_id=spreadsheet_id,
+            range_name=range_name,
+            values=values,
+            value_input_option=value_input_option,
+        )
+
+    def clear_values(
+        self,
+        spreadsheet_id: str,
+        range_name: str,
+    ) -> dict[str, Any]:
+        try:
+            response = (
+                self.service.spreadsheets()
+                .values()
+                .clear(
+                    spreadsheetId=spreadsheet_id,
+                    range=range_name,
+                    body={},
+                )
+                .execute()
+            )
+        except HttpError as error:
+            raise RuntimeError(
+                f"Failed to clear '{range_name}' in spreadsheet "
+                f"'{spreadsheet_id}'."
+            ) from error
+
+        return response
+
+    def ensure_sheet_exists(
+        self,
+        spreadsheet_id: str,
+        sheet_name: str,
+    ) -> None:
+        try:
+            spreadsheet = (
+                self.service.spreadsheets()
+                .get(spreadsheetId=spreadsheet_id)
+                .execute()
+            )
+        except HttpError as error:
+            raise RuntimeError(
+                f"Failed to fetch spreadsheet '{spreadsheet_id}'."
+            ) from error
+
+        for sheet in spreadsheet.get("sheets", []):
+            title = sheet.get("properties", {}).get("title")
+            if title == sheet_name:
+                return
+
+        try:
+            (
+                self.service.spreadsheets()
+                .batchUpdate(
+                    spreadsheetId=spreadsheet_id,
+                    body={
+                        "requests": [
+                            {
+                                "addSheet": {
+                                    "properties": {
+                                        "title": sheet_name,
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                )
+                .execute()
+            )
+        except HttpError as error:
+            raise RuntimeError(
+                f"Failed to create sheet '{sheet_name}' in spreadsheet "
+                f"'{spreadsheet_id}'."
+            ) from error
+
     def _get_values(
         self,
         spreadsheet_id: str,
