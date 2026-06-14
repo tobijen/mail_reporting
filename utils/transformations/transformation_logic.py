@@ -10,27 +10,12 @@ if TYPE_CHECKING:
     from utils.storage.google_sheets_manager import GoogleSheetManager
 
 
-EMAIL_ADDRESS_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._%+-])"
-    r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
-    r"(?![A-Za-z0-9._%+-])"
-)
-
-EXTRACTED_EMAIL_HEADERS = [
-    "source_row",
-    "email_address",
-    "found_in",
-    "subject",
-    "sender",
-    "date",
-]
-
 
 @dataclass(frozen=True)
 class ExtractedEmailAddress:
     source_row: int
     email_address: str
-    found_in: str
+    # found_in: str
     subject: str
     sender: str
     date: str
@@ -39,7 +24,7 @@ class ExtractedEmailAddress:
         return [
             self.source_row,
             self.email_address,
-            self.found_in,
+            # self.found_in,
             self.subject,
             self.sender,
             self.date,
@@ -47,18 +32,31 @@ class ExtractedEmailAddress:
 
 
 def extract_email_addresses(text: Any) -> list[str]:
+
+    email_address_pattern = re.compile(
+        r"(?<![A-Za-z0-9._%+-])"
+        r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
+        r"(?![A-Za-z0-9._%+-])"
+    )
+
     if text is None:
         return []
 
     normalized_addresses: list[str] = []
     seen: set[str] = set()
-    for match in EMAIL_ADDRESS_PATTERN.finditer(str(text)):
+    for match in email_address_pattern.finditer(str(text)):
         address = match.group(1).strip().lower()
         if address not in seen:
             normalized_addresses.append(address)
             seen.add(address)
 
     return normalized_addresses
+
+
+def _get_cell(row: list[Any], index: int) -> str:
+    if index >= len(row):
+        return ""
+    return str(row[index])
 
 
 def transform_raw_email_rows(
@@ -105,7 +103,7 @@ def transform_raw_email_rows(
                     ExtractedEmailAddress(
                         source_row=row_number,
                         email_address=address,
-                        found_in=column,
+                        #found_in=column,
                         subject=subject,
                         sender=sender,
                         date=date,
@@ -123,6 +121,17 @@ def transform_google_sheet_email_addresses(
     target_sheet_name: str,
     search_columns: tuple[str, ...] = ("sender", "body", "subject"),
 ) -> dict[str, int]:
+    
+    extracted_email_headers = [
+        "source_row",
+        "email_address",
+        # "found_in",
+        "subject",
+        "sender",
+        "date",
+    ]
+
+
     source_rows = manager.get_values(
         spreadsheet_id=spreadsheet_id,
         range_name=f"{source_sheet_name}!A:Z",
@@ -132,18 +141,23 @@ def transform_google_sheet_email_addresses(
         search_columns=search_columns,
     )
 
+    # check sheet exists
     manager.ensure_sheet_exists(
         spreadsheet_id=spreadsheet_id,
         sheet_name=target_sheet_name,
     )
+
+    # clear values in sheet
     manager.clear_values(
         spreadsheet_id=spreadsheet_id,
         range_name=f"{target_sheet_name}!A:F",
     )
+
+    # write new values to sheet
     manager.set_values(
         spreadsheet_id=spreadsheet_id,
         range_name=f"{target_sheet_name}!A:F",
-        values=[EXTRACTED_EMAIL_HEADERS]
+        values=[extracted_email_headers]
         + [address.to_row() for address in extracted_addresses],
     )
 
@@ -152,11 +166,6 @@ def transform_google_sheet_email_addresses(
         "extracted_count": len(extracted_addresses),
     }
 
-
-def _get_cell(row: list[Any], index: int) -> str:
-    if index >= len(row):
-        return ""
-    return str(row[index])
 
 
 if __name__ == "__main__":
